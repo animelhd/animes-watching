@@ -13,7 +13,7 @@ Laravel Favorite
 ## Installing
 
 ```shell
-$ composer require overtrue/laravel-favorite -vvv
+$ composer require animelhd/animes-watching -vvv
 ```
 
 ### Configuration
