@@ -2,20 +2,22 @@
 
 namespace Animelhd\AnimesWatching\Traits;
 
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Pagination\AbstractCursorPaginator;
+use Illuminate\Pagination\AbstractPaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\LazyCollection;
 
 /**
  * @property \Illuminate\Database\Eloquent\Collection $watchings
  */
 trait Watchinger
 {
-    public function watching(Model $object)
+    public function watching(Model $object): void
     {
         /* @var \Animelhd\AnimesWatching\Traits\Watchingable $object */
-        if (!$this->hasWatchinged($object)) {
+        if (! $this->hasWatchinged($object)) {
             $watching = app(config('animeswatching.watching_model'));
             $watching->{config('animeswatching.user_foreign_key')} = $this->getKey();
 
@@ -23,7 +25,7 @@ trait Watchinger
         }
     }
 
-    public function unwatching(Model $object)
+    public function unwatching(Model $object): void
     {
         /* @var \Animelhd\AnimesWatching\Traits\Watchingable $object */
         $relation = $object->watchings()
@@ -37,7 +39,7 @@ trait Watchinger
         }
     }
 
-    public function toggleWatching(Model $object)
+    public function toggleWatching(Model $object): void
     {
         $this->hasWatchinged($object) ? $this->unwatching($object) : $this->watching($object);
     }
@@ -55,52 +57,44 @@ trait Watchinger
         return $this->hasMany(config('animeswatching.watching_model'), config('animeswatching.user_foreign_key'), $this->getKeyName());
     }
 
-    public function attachWatchingStatus($watchingables, callable $resolver = null)
+    public function attachWatchingStatus(&$watchingables, ?callable $resolver)
     {
-        $returnFirst = false;
-        $toArray = false;
-
-        switch (true) {
-            case $watchingables instanceof Model:
-                $returnFirst = true;
-                $watchingables = \collect([$watchingables]);
-                break;
-            case $watchingables instanceof LengthAwarePaginator:
-                $watchingables = $watchingables->getCollection();
-                break;
-            case $watchingables instanceof Paginator:
-                $watchingables = \collect($watchingables->items());
-                break;
-            case \is_array($watchingables):
-                $watchingables = \collect($watchingables);
-                $toArray = true;
-                break;
-        }
-
-        \abort_if(!($watchingables instanceof Collection), 422, 'Invalid $watchingables type.');
-
-        $watchinged = $this->watchings()->get()->keyBy(function ($item) {
+        $watchings = $this->watchings()->get()->keyBy(function ($item) {
             return \sprintf('%s-%s', $item->watchingable_type, $item->watchingable_id);
         });
 
-        $watchingables->map(function ($watchingable) use ($watchinged, $resolver) {
+        $attachStatus = function ($watchingable) use ($watchings, $resolver) {
             $resolver = $resolver ?? fn ($m) => $m;
             $watchingable = $resolver($watchingable);
 
-            if ($watchingable && \in_array(Watchingable::class, \class_uses($watchingable))) {
+            if (\in_array(Watchingable::class, \class_uses($watchingable))) {
                 $key = \sprintf('%s-%s', $watchingable->getMorphClass(), $watchingable->getKey());
-                $watchingable->setAttribute('has_watchinged', $watchinged->has($key));
+                $watchingable->setAttribute('has_watchinged', $watchings->has($key));
             }
-        });
 
-        return $returnFirst ? $watchingables->first() : ($toArray ? $watchingables->all() : $watchingables);
+            return $watchingable;
+        };
+
+        switch (true) {
+            case $watchingables instanceof Model:
+                return $attachStatus($watchingables);
+            case $watchingables instanceof Collection:
+                return $watchingables->each($attachStatus);
+            case $watchingables instanceof LazyCollection:
+                return $watchingables = $watchingables->map($attachStatus);
+            case $watchingables instanceof AbstractPaginator:
+            case $watchingables instanceof AbstractCursorPaginator:
+                return $watchingables->through($attachStatus);
+            case $watchingables instanceof Paginator:
+                // custom paginator will return a collection
+                return collect($watchingables->items())->transform($attachStatus);
+            case \is_array($watchingables):
+                return \collect($watchingables)->transform($attachStatus);
+            default:
+                throw new \InvalidArgumentException('Invalid argument type.');
+        }
     }
 
-    /**
-     * Get Query Builder for watchings
-     *
-     * @return Illuminate\Database\Eloquent\Builder
-     */
     public function getWatchingItems(string $model)
     {
         return app($model)->whereHas(

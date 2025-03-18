@@ -13,23 +13,28 @@ trait Watchingable
     /**
      * @deprecated renamed to `hasBeenWatchingedBy`, will be removed at 5.0
      */
-    public function isWatchingedBy(Model $user)
+    public function isWatchingedBy(Model $user): bool
+    {
+        return $this->hasBeenWatchingedBy($user);
+    }
+
+    public function hasFavoriter(Model $user): bool
     {
         return $this->hasBeenWatchingedBy($user);
     }
 
     public function hasBeenWatchingedBy(Model $user): bool
     {
-        if (\is_a($user, config('auth.providers.users.model'))) {
-            if ($this->relationLoaded('watchingers')) {
-                return $this->watchingers->contains($user);
-            }
-
-            return ($this->relationLoaded('watchings') ? $this->watchings : $this->watchings())
-                    ->where(\config('animeswatching.user_foreign_key'), $user->getKey())->count() > 0;
+        if (! \is_a($user, config('animeswatching.watchinger_model'))) {
+            return false;
         }
 
-        return false;
+        if ($this->relationLoaded('watchingers')) {
+            return $this->watchingers->contains($user);
+        }
+
+        return ($this->relationLoaded('watchings') ? $this->watchings : $this->watchings())
+            ->where(\config('animeswatching.user_foreign_key'), $user->getKey())->count() > 0;
     }
 
     public function watchings(): \Illuminate\Database\Eloquent\Relations\MorphMany
@@ -40,7 +45,7 @@ trait Watchingable
     public function watchingers(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
     {
         return $this->belongsToMany(
-            config('auth.providers.users.model'),
+            config('animeswatching.watchinger_model'),
             config('animeswatching.watchings_table'),
             'watchingable_id',
             config('animeswatching.user_foreign_key')

@@ -50,7 +50,7 @@ class Watching extends Model
 
     public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
-        return $this->belongsTo(\config('auth.providers.users.model'), \config('animeswatching.user_foreign_key'));
+        return $this->belongsTo(\config('animeswatching.watchinger_model'), \config('animeswatching.user_foreign_key'));
     }
 
     public function watchinger(): \Illuminate\Database\Eloquent\Relations\BelongsTo

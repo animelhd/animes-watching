@@ -19,5 +19,10 @@ return [
     /*
      * Model name for watching record.
      */
-    'watching_model' => 'Animelhd\AnimesWatching\Watching',
+    'watching_model' => Animelhd\AnimesWatching\Watching::class,
+
+     /*
+     * Model name for watchinger model.
+     */
+    'watchinger_model' => App\Models\User::class,
 ];
