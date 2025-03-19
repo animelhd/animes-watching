@@ -18,7 +18,7 @@ trait Watchingable
         return $this->hasBeenWatchingedBy($user);
     }
 
-    public function hasFavoriter(Model $user): bool
+    public function hasWatchinger(Model $user): bool
     {
         return $this->hasBeenWatchingedBy($user);
     }
